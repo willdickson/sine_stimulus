@@ -1,0 +1,24 @@
+sine_stimulus Installation instructions 
+=========================================
+
+Requirements: 
+-------------
+
+- Python v2.5
+  http://www.python.org/
+
+- pylibusb v0.1
+  
+Installation:
+-------------
+
+The package uses the Python setuptools, you can build it by calling
+
+  python setup.py install
+
+A sample udev rules file is given in the sine_stimulus/udev_rules directory.
+
+which installs the package on your system. 
+See the "Installing Python Modules" manual inside your Python documentation 
+or at http://docs.python.org/inst/inst.html if you want to customize the
+build process or the target location.

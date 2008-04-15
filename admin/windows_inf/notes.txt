@@ -1,0 +1,19 @@
+1. Unplug the device(s) from the system.  
+
+2. Open the Windows Device Manager and remove all incorrectly
+   installed USB devices (device entries with a yellow exclamation
+   mark).
+
+3. Reconnect the device(s) to the system.  
+
+4. When Windows asks for a driver, choose the inf-file(s) created
+   above. On Win2k and WinXP systems, Windows will warn that the
+   driver is is not 'digitally signed'. Ignore this message and
+   continue with the installation.
+
+5. Open the Windows Device Manager to verify that the device is
+   installed correctly. Run the test program (testlibusb-win.exe) from
+   the 'bin directory'. It should print out the descriptors of your
+   device(s).
+
+# A reboot isn't necessary.

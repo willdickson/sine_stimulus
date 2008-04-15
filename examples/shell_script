@@ -1,0 +1,32 @@
+
+echo 'trial 1 ---------------------------------------'
+sine-stim max-cycle 5
+sine-stim sine-param 0 0.5 0 0.5 1.0
+sine-stim sine-param 1 0.5 90 0.5 1.0
+sine-stim sine-param 2 0.5 180 0.5 1.0
+sine-stim status
+sine-stim --wait start
+
+echo 'trial 2 ----------------------------------------'
+sine-stim max-cycle 10
+sine-stim sine-param 0 0.5 0 0.5 1.0
+sine-stim sine-param 1 0.5 90 0.5 1.0
+sine-stim sine-param 2 0.5 180 0.5 1.0
+sine-stim status
+sine-stim --wait start
+
+echo 'trial 3 ----------------------------------------'
+sine-stim max-cycle 15
+sine-stim sine-param 0 0.5 0 0.5 1.0
+sine-stim sine-param 1 0.5 90 0.5 1.0
+sine-stim sine-param 2 0.5 180 0.5 1.0
+sine-stim status
+sine-stim --wait start
+
+echo 'trial 4 ----------------------------------------'
+sine-stim max-cycle 20
+sine-stim sine-param 0 0.5 0 0.5 3.0
+sine-stim sine-param 1 0.5 270 0.5 3.0
+sine-stim sine-param 2 0.5 180 0.5 3.0
+sine-stim status
+sine-stim --wait start

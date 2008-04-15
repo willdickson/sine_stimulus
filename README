@@ -1,0 +1,19 @@
+sine_stimulus
+=============
+
+sine_stimulus provides a control interface for the at90usb based
+sinewave simulus generator. 
+
+
+Installation
+
+   * Installation instructions can be found in the INSTALL file.  
+
+Examples
+
+   * Examples demonstrating how to use sine_stimulus can be found in 
+     the sine_stimulus/examples directory. 
+     
+Author
+
+   * Will Dickson (wbd@caltech.edu)
