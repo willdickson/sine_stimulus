@@ -37,11 +37,21 @@ USB_CMD_GET_SINE_PARAM = 5
 USB_CMD_GET_MAX_CYCLE = 6
 USB_CMD_GET_TOP = 7
 USB_CMD_DFU_MODE = 8
+
+USB_CMD_DC_MODE_ON = 9
+USB_CMD_DC_MODE_OFF = 10
+USB_CMD_SET_DC_VAL = 11
+USB_CMD_GET_DC_MODE = 12
+USB_CMD_GET_DC_VAL = 13
+
 USB_CMD_DUMMY = 255
 
+# Constants
 RUNNING = 1
 STOPPED = 0
 WAIT_SLEEP_T = 0.1
+DC_MODE_OFF = 0
+DC_MODE_ON = 1
 
 # Command line defaults
 CMDLINE_DEFAULT_VERBOSE = False
@@ -145,6 +155,62 @@ class Pwm_sine_device:
         _check_cmd_id(USB_CMD_SET_MAX_CYCLE, cmd_id)
         return
 
+    def get_dc_mode(self):
+        # Request dc-mode from device
+        self.output_buffer[0] = chr(USB_CMD_GET_DC_MODE%0x100)
+        data = self._send_and_receive()
+        cmd_id = ord(data[0])
+        _check_cmd_id(USB_CMD_GET_DC_MODE, cmd_id)
+        if not ord(data[1]) in (0,1):
+            raise IOError('unknown dc mode received %d'%(ord(data[1]),))
+        return ord(data[1])
+
+    def get_dc_val(self,pwm_chan):
+        # Get dc value for pwm_chan from device
+        pwm_chan = int(pwm_chan)
+        if not pwm_chan in (0,1,2): 
+            raise ValueError('pwm_num must be in [0,1,2]')
+        self.output_buffer[0] = chr(USB_CMD_GET_DC_VAL%0x100)
+        self.output_buffer[1] = chr(pwm_chan%0x100)
+        data = self._send_and_receive()
+        cmd_id = ord(data[0])
+        _check_cmd_id(USB_CMD_GET_DC_VAL, cmd_id)
+        val = ord(data[2])<<8
+        val += ord(data[3])
+        val = float(val)/float(self.top)
+        return val
+
+    def set_dc_val(self,pwm_chan, val):
+        pwm_chan = int(pwm_chan)
+        if not pwm_chan in (0,1,2): 
+            raise ValueError('pwm_num must be in [0,1,2]')
+        # Convert val from float in [0,1] to int in [0,TOP-1]
+        int_val = int(val*self.top)     
+        if int_val < 0 or int_val > self.top:
+            raise ValueError('value must be in range [0,1)')
+        self.output_buffer[0] = chr(USB_CMD_SET_DC_VAL%0x100)
+        self.output_buffer[1] = chr(pwm_chan%0x100)
+        self.output_buffer[2] = chr(int_val//0x100) 
+        self.output_buffer[3] = chr(int_val%0x100)
+        data = self._send_and_receive()
+        cmd_id = ord(data[0])
+        _check_cmd_id(USB_CMD_SET_DC_VAL, cmd_id)
+        return
+
+    def dc_mode(self, val):
+        if val.lower() == 'on':
+            cmd_id = USB_CMD_DC_MODE_ON
+            
+        elif val.lower() == 'off':
+            cmd_id = USB_CMD_DC_MODE_OFF
+        else:
+            raise ValueError, 'unknown dc mode value'
+        self.output_buffer[0] = chr(cmd_id%0x100)
+        data = self._send_and_receive()
+        cmd_id_ret = ord(data[0])
+        _check_cmd_id(cmd_id,cmd_id_ret)
+        return
+
     def set_sine_param(self, pwm_chan, amp, phase, offset, freq):
         pwn_chan = int(pwm_chan)
         if not pwm_chan in (0,1,2): 
@@ -181,7 +247,6 @@ class Pwm_sine_device:
 
     def get_status(self):
         # Request status from device
-        done = False
         self.output_buffer[0] = chr(USB_CMD_GET_STATUS%0x100)
         data = self._send_and_receive()
         cmd_id = ord(data[0])
@@ -293,12 +358,7 @@ def _check_cmd_id(expected_id,received_id):
 # Commandline interface ---------------------------------------------------------
 
 SINE_STIM_USAGE_STR = """
-%prog [options] status
-%prog [options] sine-param chan amp phase offset freq 
-%prog [options] max-cycle n
-%prog [options] start
-%prog [options] stop
-%prog [options] dfu-mode
+%prog [options] command [command args]
  
 %prog provides a command line interface to the usb sinewave stimulus
 generator based on the at90usb demo-kit. Allows the user to view/change the 
@@ -307,20 +367,33 @@ in dfu programming mode.
 
 
 Command Summary:
-  status - prints  current device settings
-  sine-param - sets sinusoid parameters. Requires 5 addition arguments. 
-      chan   = channel number (0,1,2)
-      amp    = sinewave amplitude in range [0,1.0]
-      phase  = phase in range [0,360]
-      offset = sinewave offset in range [0,1.0]
-      freq   = sinewave frequency in Hz 
-  max-cycle - sets the maximum number of cycles for the lowest
-      frequency sine wave. Requires 1 additional argument.
-      n = max number of cycles
-  start - starts sinewave output
-  stop - stops sinewave output 
-  dfu-mode - puts at90usb device into dfu programming mode. 
 
+ status - prints  current device settings
+
+ sine-param - sets sinusoid parameters. Requires 5 addition arguments. 
+     chan   = channel number (0,1,2)
+     amp    = sinewave amplitude in range [0,1.0]
+     phase  = phase in range [0,360]
+     offset = sinewave offset in range [0,1.0]
+     freq   = sinewave frequency in Hz 
+
+ max-cycle -  sets the maximum number of cycles for the lowest frequency sine 
+ wave. Requires 1 additional argument.
+     n = max number of cycles
+
+ start - starts sinewave output
+
+ stop - stops sinewave output 
+
+ dfu-mode - puts at90usb device into dfu programming mode. 
+
+ dc-mode - turns dc mode on or off. Requires 1 argument.
+     mode = on or off
+
+ dc-val - sets value of pwm when device is idle and dc-mode is on. Requires 2 
+ addition arguments.
+     chan = channel number (0,1,2)
+     val  = pwm value in range [0,1.0]
 
 Examples: 
 
@@ -341,6 +414,12 @@ Examples:
 
   %prog dfu-mode
   Places at90usb device into dfu programming mode.
+
+  %prog dc-mode on
+  Turns dc mode on 
+
+  dc-val 1 0.5
+  Sets dc-mode idle value of channel 1 to 0.5
 
 """
 
@@ -386,11 +465,68 @@ def sine_stim_main():
 
     elif command=='dfu-mode':
         dfu_mode(options)
-        
+    elif command=='dc-mode':
+        set_dc_mode(options,args)
+    elif command=='dc-val':
+        set_dc_val(options,args)
     else:
         print 'E: uknown command %s'%(command,)
         sys.exit(1)
 
+def set_dc_val(options,args):
+    v = options.verbose  
+    if not len(args)==3:
+        print 'E: incorrect # of arguments for command %s. 2 required'%(args[0].lower(),)
+        sys.exit(1)
+    chn = int(args[1])
+    val = float(args[2])
+
+    # Open device
+    vprint('opening device ... ',v,comma=True)
+    dev = Pwm_sine_device()
+    vprint('done',v)
+
+    # Set sine parameters
+    vprint('setting max_cycle ... ',v, comma=True)
+    dev.set_dc_val(chn,val)
+    vprint('done',v)
+
+    # Close device
+    vprint('closing device ... ', v, comma=True)
+    dev.close()
+    vprint('done',v)
+    return
+
+
+def set_dc_mode(options,args):
+    v = options.verbose  
+    if not len(args)==2:
+        print 'E: incorrect # of arguments for command %s. 1 required'%(args[0].lower(),)
+        sys.exit(1)
+    mode = args[1]
+    mode = mode.lower()
+
+    print mode 
+
+    if not( mode == 'on' or  mode == 'off'):
+        print 'E: unknown mode %s'%(mode,)
+        sys.exit(1)
+
+    # Open device
+    vprint('opening device ... ',v,comma=True)
+    dev = Pwm_sine_device()
+    vprint('done',v)
+
+    # Set sine parameters
+    vprint('setting dc mode ... ',v, comma=True)
+    dev.dc_mode(mode)
+    vprint('done',v)
+
+    # Close device
+    vprint('closing device ... ', v, comma=True)
+    dev.close()
+    vprint('done',v)
+    return
 
 def dfu_mode(options):
     v = options.verbose  
@@ -456,6 +592,7 @@ def set_max_cycle(options,args):
     v = options.verbose  
     if not len(args)==2:
         print 'E: incorrect # of arguments for command %s. 1 required'%(args[0].lower(),)
+        sys.exit(1)
     max_cycle = int(args[1])
     
     # Open device
@@ -478,6 +615,7 @@ def set_sine_param(options,args):
     v = options.verbose  
     if not len(args)==6:
         print 'E: incorrect # of arguments for command %s. 5 required'%(args[0].lower(),)
+        sys.exit(1)
 
     # Unpack parameters
     pwm_num = int(args[1])
@@ -519,7 +657,21 @@ def print_status(options):
     vprint('getting max_cycle ... ',v,comma=True)
     max_cycle = dev.get_max_cycle()
     vprint('done',v)
-    
+
+    # Get dc-mode
+    vprint('getting dc mode ... ',v,comma=True)
+    dc_mode = dev.get_dc_mode()
+    vprint('done',v)
+
+    # Get dc-mode values
+    vprint('getting dc mode values ... ',v,comma=True)
+    dc_val_list = []
+    for i in range(0,3):
+        vprint('pwm%d'%(i,),v,comma=True)
+        dc_val = dev.get_dc_val(i)
+        dc_val_list.append(dc_val)
+    vprint('done',v)
+   
     # Get sinewave parameters
     param_list = []
     vprint('getting sinewave parameters ... ',v,comma=True)
@@ -535,12 +687,25 @@ def print_status(options):
     vprint('done',v)
 
     # Display values
+    print 
     if run_status == RUNNING:
         print 'status: running'
     else:
         print 'status: stopped'
+
     print 'maximum cycles: %d'%(max_cycle,)
+
+    if dc_mode == DC_MODE_ON:
+        print 'dc mode: on'
+    else:
+        print 'dc mode: off'
+    print 'dc vals: (%1.2f, %1.2f, %1.2f)'%tuple(dc_val_list)
+
+    print 
+    print 'sine params:'
+    print '-'*40
     print 'chan\t amp\t phase\t offset\t freq'
+
     for p in param_list:
         print '%d\t %1.2f\t %1.0f\t %1.2f\t %1.2f'%p
     return
