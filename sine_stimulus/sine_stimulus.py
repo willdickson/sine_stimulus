@@ -43,7 +43,7 @@ USB_CMD_DC_MODE_OFF = 10
 USB_CMD_SET_DC_VAL = 11
 USB_CMD_GET_DC_MODE = 12
 USB_CMD_GET_DC_VAL = 13
-
+USB_CMD_DEBUG = 254
 USB_CMD_DUMMY = 255
 
 # Constants
@@ -180,6 +180,25 @@ class Pwm_sine_device:
         val = float(val)/float(self.top)
         return val
 
+    def get_debug_vals(self):
+        self.output_buffer[0] = chr(USB_CMD_DEBUG%0x100)
+        data = self._send_and_receive()
+        cmd_id = ord(data[0])
+        _check_cmd_id(USB_CMD_DEBUG, cmd_id)
+        val0 = ord(data[1])<<8
+        val0 += ord(data[2])
+        val1 = ord(data[3])<<8
+        val1 += ord(data[4])
+        val2 = ord(data[5])<<8
+        val2 += ord(data[6])
+        val3 = ord(data[7])<<8
+        val3 += ord(data[8])
+        val4 = ord(data[9])<<8
+        val4 += ord(data[10])
+        val5 = ord(data[11])<<8
+        val5 += ord(data[12])
+        return val0, val1, val2, val3, val4, val5
+        
     def set_dc_val(self,pwm_chan, val):
         pwm_chan = int(pwm_chan)
         if not pwm_chan in (0,1,2): 
@@ -469,9 +488,38 @@ def sine_stim_main():
         set_dc_mode(options,args)
     elif command=='dc-val':
         set_dc_val(options,args)
+    elif command=='debug':
+        get_debug_vals(options)
+    #elif command=='help':
+        #for k,v in parser.__dict__.iteritems():
+        #    print k, v
+        #pass
     else:
         print 'E: uknown command %s'%(command,)
         sys.exit(1)
+
+
+def get_debug_vals(options):
+    v = options.verbose  
+    # Open device
+    vprint('opening device ... ',v,comma=True)
+    dev = Pwm_sine_device()
+    vprint('done',v)
+
+    # Set sine parameters
+    vprint('getting debug values ... ',v, comma=True)
+    vals = dev.get_debug_vals()
+    vprint('done',v)
+
+    # Close device
+    vprint('closing device ... ', v, comma=True)
+    dev.close()
+    vprint('done',v)
+
+    print 'debug vals:', vals
+
+    return
+    
 
 def set_dc_val(options,args):
     v = options.verbose  
@@ -496,7 +544,6 @@ def set_dc_val(options,args):
     dev.close()
     vprint('done',v)
     return
-
 
 def set_dc_mode(options,args):
     v = options.verbose  
@@ -663,14 +710,14 @@ def print_status(options):
     dc_mode = dev.get_dc_mode()
     vprint('done',v)
 
-    # Get dc-mode values
-    vprint('getting dc mode values ... ',v,comma=True)
-    dc_val_list = []
-    for i in range(0,3):
-        vprint('pwm%d'%(i,),v,comma=True)
-        dc_val = dev.get_dc_val(i)
-        dc_val_list.append(dc_val)
-    vprint('done',v)
+#     # Get dc-mode values
+#     vprint('getting dc mode values ... ',v,comma=True)
+#     dc_val_list = []
+#     for i in range(0,3):
+#         vprint('pwm%d'%(i,),v,comma=True)
+#         dc_val = dev.get_dc_val(i)
+#         dc_val_list.append(dc_val)
+#     vprint('done',v)
    
     # Get sinewave parameters
     param_list = []
@@ -699,7 +746,7 @@ def print_status(options):
         print 'dc mode: on'
     else:
         print 'dc mode: off'
-    print 'dc vals: (%1.2f, %1.2f, %1.2f)'%tuple(dc_val_list)
+    #print 'dc vals: (%1.2f, %1.2f, %1.2f)'%tuple(dc_val_list)
 
     print 
     print 'sine params:'
