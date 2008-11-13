@@ -387,60 +387,113 @@ in dfu programming mode.
 
 Command Summary:
 
- status - prints  current device settings
+ status      - prints  current device settings
+ sine-param  - sets sinusoid parameters. 
+ max-cycle   - sets the maximum number of cycles for the lowest freq 
+ start       - starts sinewave output
+ stop        - stops sinewave output 
+ dfu-mode    - puts at90usb device into dfu programming mode 
+ dc-mode     - turns dc mode on or off
+ dc-val      - sets idle state pwm value for a given channel. Requires 
+               that dc-mode be set to 'on' to take 
+"""
 
- sine-param - sets sinusoid parameters. Requires 5 addition arguments. 
-     chan   = channel number (0,1,2)
-     amp    = sinewave amplitude in range [0,1.0]
-     phase  = phase in range [0,360]
-     offset = sinewave offset in range [0,1.0]
-     freq   = sinewave frequency in Hz 
+STATUS_HELP = """\
+sine-stim status 
 
- max-cycle -  sets the maximum number of cycles for the lowest frequency sine 
- wave. Requires 1 additional argument.
-     n = max number of cycles
+prints current device settings to stdout.
+"""
 
- start - starts sinewave output
+SINE_PARAM_HELP = """\
+sine-stim sine-param [chan] [amp] [phase] [offset] [freq]
 
- stop - stops sinewave output 
+sets sinusoid output parameters for specified channel. 
 
- dfu-mode - puts at90usb device into dfu programming mode. 
+arguments:
 
- dc-mode - turns dc mode on or off. Requires 1 argument.
-     mode = on or off
+  chan   = channel number (0,1,2)
+  amp    = sinewave amplitude in range [0,1.0]
+  phase  = phase in range [0,360]
+  offset = sinewave offset in range [0,1.0]
+  freq   = sinewave frequency in Hz   
+""" 
 
- dc-val - sets value of pwm when device is idle and dc-mode is on. Requires 2 
- addition arguments.
-     chan = channel number (0,1,2)
-     val  = pwm value in range [0,1.0]
+MAX_CYCLE_HELP = """\
+sine-stim max-cycle [n]
 
-Examples: 
+sets the maximum number of cycles for the lowest frequency sine wave.
 
-  %prog status 
-  Returns current device status.
+arguments:
 
-  %prog sine-param 1 1.0 270 1.0 
-  Sets sinewave parameters for pwm channel #1. 
+  n = max number of cycles 
+"""
 
-  %prog max-cycle 3
-  Sets maximum number of cycles to 3
+START_HELP = """\
+sine-stim start
 
-  %prog start
-  Starts sinewave output 
+starts sinewave output
+"""
 
-  %prog stop
-  Stops sinewave output
+STOP_HELP = """\
+sine-stim stop
 
-  %prog dfu-mode
-  Places at90usb device into dfu programming mode.
+stops sinewave output
+"""
 
-  %prog dc-mode on
-  Turns dc mode on 
+DFU_MODE_HELP = """\
+sine-stim dfu-mode
 
-  dc-val 1 0.5
-  Sets dc-mode idle value of channel 1 to 0.5
+puts at90usb device into dfu programming mode for reprogramming of the
+firmware.
+"""
+
+DC_MODE_HELP = """\
+sine-stim dc-mode [value]
+
+turns dc mode on or off. When dc-mode is on the pwm values the output
+channels take when the device is idle can be spedified by setting the
+dc-val value.
+
+arguments:
+  
+  value = on/off 
+   
+"""
+
+DC_VAL_HELP = """\
+sine-stim dc-val [chan] [value]
+
+sets idle state pwm value for a given channel. Requires that dc-mode
+be set to 'on' to take effect
+
+arguments:
+  chan = channel number (0,1,2)
+  val  = pwm value in range [0,1.0]
+
 
 """
+
+HELP_HELP = """\
+sine-stim help [cmd]
+
+displays help information for the given command or a general help message if no 
+command is given.
+
+arguments:
+  cmd = a sine-stim command string  
+"""
+
+HELP_TABLE = {
+    'status' : STATUS_HELP, 
+    'sine-param' : SINE_PARAM_HELP,
+    'max-cycle' : MAX_CYCLE_HELP,
+    'start' : START_HELP,
+    'stop' : STOP_HELP,
+    'dfu-mode' : DFU_MODE_HELP,
+    'dc-mode' : DC_MODE_HELP,
+    'dc-val' : DC_VAL_HELP, 
+    'help' : HELP_HELP
+}
 
 def sine_stim_main():
     """
@@ -490,13 +543,23 @@ def sine_stim_main():
         set_dc_val(options,args)
     elif command=='debug':
         get_debug_vals(options)
-    #elif command=='help':
-        #for k,v in parser.__dict__.iteritems():
-        #    print k, v
-        #pass
+    elif command=='help':
+        help(options,args,parser.print_help)
     else:
         print 'E: uknown command %s'%(command,)
         sys.exit(1)
+
+def help(options,args,print_help):
+    v = options.verbose  
+    if len(args) == 1:
+        print_help()
+    elif len(args) == 2:
+        try:
+            print HELP_TABLE[args[1].lower()]
+        except:
+            print 'E: unable to get help for "%s"  - unknown command'%(args[1],)
+    else:
+        print 'E: too many argument of command help'
 
 
 def get_debug_vals(options):
@@ -710,14 +773,14 @@ def print_status(options):
     dc_mode = dev.get_dc_mode()
     vprint('done',v)
 
-#     # Get dc-mode values
-#     vprint('getting dc mode values ... ',v,comma=True)
-#     dc_val_list = []
-#     for i in range(0,3):
-#         vprint('pwm%d'%(i,),v,comma=True)
-#         dc_val = dev.get_dc_val(i)
-#         dc_val_list.append(dc_val)
-#     vprint('done',v)
+    # Get dc-mode values
+    vprint('getting dc mode values ... ',v,comma=True)
+    dc_val_list = []
+    for i in range(0,3):
+        vprint('pwm%d'%(i,),v,comma=True)
+        dc_val = dev.get_dc_val(i)
+        dc_val_list.append(dc_val)
+    vprint('done',v)
    
     # Get sinewave parameters
     param_list = []
@@ -746,7 +809,7 @@ def print_status(options):
         print 'dc mode: on'
     else:
         print 'dc mode: off'
-    #print 'dc vals: (%1.2f, %1.2f, %1.2f)'%tuple(dc_val_list)
+    print 'dc vals: (%1.2f, %1.2f, %1.2f)'%tuple(dc_val_list)
 
     print 
     print 'sine params:'
